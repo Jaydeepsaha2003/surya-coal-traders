@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm, slightly tinted light theme — cards pop white against a soft
+       sand background, with stronger borders so nothing looks washed out. */
+    --background: 30 24% 94%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 20 95% 44%; /* deep ember orange */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 30 22% 89%;
+    --secondary-foreground: 222 47% 14%;
+
+    --muted: 30 20% 90%;
+    --muted-foreground: 25 12% 38%;
+
+    --accent: 22 90% 90%;
+    --accent-foreground: 20 85% 30%;
+
+    --destructive: 0 78% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 28 18% 82%;
+    --input: 28 18% 80%;
+    --ring: 20 95% 44%;
+
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 220 26% 7%;
+    --foreground: 30 20% 96%;
+
+    --card: 220 24% 10%;
+    --card-foreground: 30 20% 96%;
+
+    --popover: 220 24% 10%;
+    --popover-foreground: 30 20% 96%;
+
+    --primary: 24 94% 54%;
+    --primary-foreground: 220 26% 8%;
+
+    --secondary: 220 18% 16%;
+    --secondary-foreground: 30 20% 96%;
+
+    --muted: 220 18% 16%;
+    --muted-foreground: 30 10% 68%;
+
+    --accent: 24 50% 22%;
+    --accent-foreground: 30 20% 96%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 30 20% 98%;
+
+    --border: 220 18% 20%;
+    --input: 220 18% 20%;
+    --ring: 24 94% 54%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
