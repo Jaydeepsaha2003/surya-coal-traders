@@ -160,6 +160,7 @@ export const settings = sqliteTable('settings', {
   id: integer('id').primaryKey().default(1),
   theme: text('theme').notNull().default('dark'),
   businessName: text('business_name').notNull().default('Surya Coal Traders'),
+  bankOpeningBalance: integer('bank_opening_balance').notNull().default(0), // paise
 });
 
 export type Customer = typeof customers.$inferSelect;

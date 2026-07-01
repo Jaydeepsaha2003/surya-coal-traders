@@ -6,8 +6,20 @@ import {
   TrendingUp,
   Phone,
   Loader2,
+  Landmark,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -20,7 +32,12 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { PnlChart } from '@/components/pnl-chart';
 import { useRouter } from '@/lib/router';
-import { formatCurrencyPaise, formatCurrencyCompactPaise, formatDate } from '@/lib/utils';
+import {
+  formatCurrencyPaise,
+  formatCurrencyCompactPaise,
+  formatDate,
+  paiseToRupees,
+} from '@/lib/utils';
 
 export const DashboardPage = () => {
   const { navigate } = useRouter();
@@ -28,18 +45,28 @@ export const DashboardPage = () => {
   const [pnl, setPnl] = useState<any[]>([]);
   const [whoToCall, setWhoToCall] = useState<any[]>([]);
   const [recent, setRecent] = useState<any[]>([]);
+  const [openingBal, setOpeningBal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [bankOpen, setBankOpen] = useState(false);
+
+  const loadMetrics = async () => {
+    const [m, s] = await Promise.all([
+      window.surya.dashboard.metrics(),
+      window.surya.settings.get(),
+    ]);
+    setMetrics(m);
+    setOpeningBal(s?.bankOpeningBalance ?? 0);
+  };
 
   useEffect(() => {
     (async () => {
       try {
-        const [m, p, w, r] = await Promise.all([
-          window.surya.dashboard.metrics(),
+        const [, p, w, r] = await Promise.all([
+          loadMetrics(),
           window.surya.dashboard.monthlyPnl(),
           window.surya.dashboard.whoToCall(6),
           window.surya.trades.recent(10),
         ]);
-        setMetrics(m);
         setPnl(p);
         setWhoToCall(w);
         setRecent(r);
@@ -60,7 +87,14 @@ export const DashboardPage = () => {
   return (
     <div className="space-y-5">
       {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Kpi
+          label="Bank Balance"
+          value={formatCurrencyCompactPaise(metrics?.bankBalance)}
+          icon={Landmark}
+          tone={(metrics?.bankBalance ?? 0) >= 0 ? 'text-sky-600' : 'text-destructive'}
+          onClick={() => setBankOpen(true)}
+        />
         <Kpi
           label="Total Receivable"
           value={formatCurrencyCompactPaise(metrics?.totalReceivable)}
@@ -178,7 +212,79 @@ export const DashboardPage = () => {
           {recent.length === 0 && <TableEmpty>No trades recorded yet.</TableEmpty>}
         </CardContent>
       </Card>
+
+      {bankOpen && (
+        <BankModal
+          opening={openingBal}
+          balance={metrics?.bankBalance ?? 0}
+          onClose={() => setBankOpen(false)}
+          onSaved={async () => {
+            setBankOpen(false);
+            await loadMetrics();
+          }}
+        />
+      )}
     </div>
+  );
+};
+
+const BankModal = ({
+  opening,
+  balance,
+  onClose,
+  onSaved,
+}: {
+  opening: number;
+  balance: number;
+  onClose: () => void;
+  onSaved: () => void;
+}) => {
+  const [value, setValue] = useState(String(paiseToRupees(opening) || ''));
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await window.surya.settings.update({ bankOpeningBalance: Math.round((Number(value) || 0) * 100) });
+      toast.success('Opening bank balance updated');
+      onSaved();
+    } catch (err) {
+      toast.error('Save failed', { description: (err as Error).message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Bank Balance</DialogTitle>
+        </DialogHeader>
+        <div className="rounded-md border bg-muted/40 p-3 text-sm">
+          Current balance: <span className="font-semibold">{formatCurrencyPaise(balance)}</span>
+          <div className="mt-1 text-xs text-muted-foreground">
+            = opening balance + all receipts − all payments.
+          </div>
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Opening bank balance (₹)</Label>
+          <Input type="number" value={value} onChange={(e) => setValue(e.target.value)} />
+          <p className="text-xs text-muted-foreground">
+            Set your bank balance as on the day you started using the app. Receipts and payments
+            recorded here adjust it automatically.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

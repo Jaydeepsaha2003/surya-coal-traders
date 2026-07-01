@@ -196,6 +196,7 @@ export type DashboardMetrics = {
   totalPayable: number; // paise
   totalTrades: number;
   thisMonthProfit: number; // paise
+  bankBalance: number; // paise — opening + receipts − payments
 };
 
 export type MonthlyPnlPoint = {

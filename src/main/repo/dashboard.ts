@@ -1,6 +1,7 @@
 import { addMonths, format, startOfMonth, subMonths } from 'date-fns';
 import { getRawSqlite } from '../db';
 import { debtorsSummary, creditorsSummary } from './ledger';
+import { readSettings } from './settings';
 import type {
   DashboardMetrics,
   DateRange,
@@ -43,11 +44,24 @@ export const dashboardMetrics = (): DashboardMetrics => {
     )
     .get(monthStart) as { p: number };
 
+  // Bank balance = opening + all receipts (money in) − all payments (money out).
+  const cash = sqlite
+    .prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN entry_type = 'receipt' THEN credit ELSE 0 END), 0) AS receipts,
+         COALESCE(SUM(CASE WHEN entry_type = 'payment' THEN debit ELSE 0 END), 0) AS payments
+       FROM ledger_entries`,
+    )
+    .get() as { receipts: number; payments: number };
+  const opening = readSettings().bankOpeningBalance ?? 0;
+  const bankBalance = opening + cash.receipts - cash.payments;
+
   return {
     totalReceivable: receivable,
     totalPayable: payable,
     totalTrades: tradeCount,
     thisMonthProfit: profitRow.p,
+    bankBalance,
   };
 };
 

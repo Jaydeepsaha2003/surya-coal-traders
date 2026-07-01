@@ -158,13 +158,15 @@ const applySchema = (sqlite: Database.Database) => {
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY DEFAULT 1,
       theme TEXT NOT NULL DEFAULT 'dark',
-      business_name TEXT NOT NULL DEFAULT 'Surya Coal Traders'
+      business_name TEXT NOT NULL DEFAULT 'Surya Coal Traders',
+      bank_opening_balance INTEGER NOT NULL DEFAULT 0
     );
     INSERT OR IGNORE INTO settings (id) VALUES (1);
   `);
 
   // Idempotent upgrades so databases created by earlier versions keep working.
   addColumnIfMissing(sqlite, 'customers', 'credit_period', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(sqlite, 'settings', 'bank_opening_balance', 'INTEGER NOT NULL DEFAULT 0');
   addColumnIfMissing(sqlite, 'trades', 'purchase_voucher', 'TEXT');
   addColumnIfMissing(sqlite, 'trades', 'sale_voucher', 'TEXT');
   addColumnIfMissing(sqlite, 'trades', 'transporter_id', 'TEXT');

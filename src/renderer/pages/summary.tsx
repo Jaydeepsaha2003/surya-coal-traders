@@ -21,21 +21,29 @@ export const SummaryPage = () => {
   const [range, setRange] = useState<Range>({ from: '', to: '' });
   const [search, setSearch] = useState('');
 
+  const load = async () => {
+    try {
+      const r = { from: range.from || undefined, to: range.to || undefined };
+      const data = await window.surya.ledger.receiptsPayments(r);
+      setRows(data);
+    } catch (err) {
+      toast.error('Failed to load', { description: (err as Error).message });
+      setRows([]);
+    }
+  };
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = { from: range.from || undefined, to: range.to || undefined };
-        const data = await window.surya.ledger.receiptsPayments(r);
-        if (!cancelled) setRows(data);
-      } catch (err) {
-        toast.error('Failed to load', { description: (err as Error).message });
-        if (!cancelled) setRows([]);
-      }
-    })();
+    load();
+    // Refresh when the window/tab regains focus so deletions made elsewhere
+    // (e.g. in the Debtors/Creditors ledger) show up here without a restart.
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
     return () => {
-      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range.from, range.to]);
 
   const matches = (r: any) =>
