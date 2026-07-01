@@ -67,6 +67,15 @@ export const LedgerView = ({ config }: { config: Config }) => {
   };
   useEffect(() => {
     load();
+    // Re-fetch when the window regains focus so entries added/edited elsewhere
+    // (including backdated receipts/payments) always show current figures.
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.kind]);
 
@@ -517,6 +526,9 @@ const LedgerDrawer = ({
   };
   useEffect(() => {
     reload();
+    const onFocus = () => reload();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.partyType, party.partyId]);
 
