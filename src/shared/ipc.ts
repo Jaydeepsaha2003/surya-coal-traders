@@ -65,6 +65,7 @@ export const IPC = {
   reportSummary: 'report:summary',
   reportExportExcel: 'report:exportExcel',
   reportReceiptsPaymentsExport: 'report:receiptsPaymentsExport',
+  reportFullPdf: 'report:fullPdf',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];

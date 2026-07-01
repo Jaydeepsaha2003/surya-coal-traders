@@ -38,6 +38,7 @@ import { readSettings, updateSettings } from './repo/settings';
 import { exportReportExcel } from './excel-export';
 import { downloadMasterTemplate, importMasters, type MasterKind } from './bulk-masters';
 import { exportReceiptsPayments } from './receipts-export';
+import { exportFullReport } from './full-report';
 import type { LedgerPartyType } from '../shared/types';
 
 const handle = <T>(channel: string, fn: (...args: any[]) => Promise<T> | T) => {
@@ -122,4 +123,5 @@ export const registerIpc = () => {
   handle(IPC.reportReceiptsPaymentsExport, (range: any, fmt: 'xlsx' | 'pdf') =>
     exportReceiptsPayments(range, fmt),
   );
+  handle(IPC.reportFullPdf, (range: any) => exportFullReport(range));
 };

@@ -79,6 +79,9 @@ type SuryaApi = {
       range: { from?: string; to?: string } | undefined,
       fmt: 'xlsx' | 'pdf',
     ) => Promise<{ saved: boolean; path?: string }>;
+    fullPdf: (
+      range: { from?: string; to?: string } | undefined,
+    ) => Promise<{ saved: boolean; path?: string }>;
   };
 };
 

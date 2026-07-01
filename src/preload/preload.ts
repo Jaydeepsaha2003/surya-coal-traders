@@ -91,6 +91,8 @@ const api = {
     exportExcel: () => invoke<{ saved: boolean; path?: string }>(IPC.reportExportExcel),
     receiptsPaymentsExport: (range: { from?: string; to?: string } | undefined, fmt: 'xlsx' | 'pdf') =>
       invoke<{ saved: boolean; path?: string }>(IPC.reportReceiptsPaymentsExport, range, fmt),
+    fullPdf: (range: { from?: string; to?: string } | undefined) =>
+      invoke<{ saved: boolean; path?: string }>(IPC.reportFullPdf, range),
   },
 };
 

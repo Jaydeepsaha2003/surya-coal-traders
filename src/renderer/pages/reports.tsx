@@ -31,6 +31,7 @@ export const ReportsPage = () => {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [rpExporting, setRpExporting] = useState<'xlsx' | 'pdf' | null>(null);
+  const [fullExporting, setFullExporting] = useState(false);
   const [range, setRange] = useState<Range>({ from: '', to: '' });
   const [drill, setDrill] = useState<{ kind: 'customer' | 'supplier'; rows: any[] } | null>(null);
 
@@ -72,6 +73,19 @@ export const ReportsPage = () => {
     }
   };
 
+  const exportFullPdf = async () => {
+    setFullExporting(true);
+    try {
+      const r = { from: range.from || undefined, to: range.to || undefined };
+      const res = await window.surya.report.fullPdf(r);
+      if (res.saved) toast.success('Full PDF report saved', { description: res.path });
+    } catch (err) {
+      toast.error('Export failed', { description: (err as Error).message });
+    } finally {
+      setFullExporting(false);
+    }
+  };
+
   const openDrill = async (kind: 'customer' | 'supplier') => {
     try {
       const rows = await window.surya.ledger.allOpenInvoices(kind);
@@ -106,10 +120,16 @@ export const ReportsPage = () => {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-lg border bg-card p-4">
         <DateRangeFilter value={range} onChange={setRange} presets />
-        <Button onClick={exportReport} disabled={exporting}>
-          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-          Export to Excel
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportFullPdf} disabled={fullExporting}>
+            {fullExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+            Full PDF (Trades + Receipts + Payments)
+          </Button>
+          <Button onClick={exportReport} disabled={exporting}>
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            Export to Excel
+          </Button>
+        </div>
       </div>
       <div className="text-xs text-muted-foreground">
         Showing: <span className="font-medium text-foreground">{rangeLabel}</span>
