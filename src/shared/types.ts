@@ -127,6 +127,7 @@ export type ReceiptPaymentInput = {
   description?: string;
   mode?: ClearingMode; // defaults to on_account
   allocations?: AllocationInput[]; // required for bill_to_bill
+  tradeId?: string | null; // set for on-trade cash so it cascades if the trade is deleted
 };
 
 export type OutstandingRow = {

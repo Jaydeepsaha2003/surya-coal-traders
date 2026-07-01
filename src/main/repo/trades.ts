@@ -265,6 +265,7 @@ export const createTrade = (input: TradeFormInput): string => {
       amount: Number(input.receivedFromCustomer),
       description: `Received on trade ${tradeNo}`,
       mode: 'on_account',
+      tradeId: id, // links it to the trade so it's removed if the trade is deleted
     });
   }
   if (d.primarySupplierId && Number(input.paidToSupplier) > 0) {
@@ -274,6 +275,7 @@ export const createTrade = (input: TradeFormInput): string => {
       amount: Number(input.paidToSupplier),
       description: `Paid on trade ${tradeNo}`,
       mode: 'on_account',
+      tradeId: id,
     });
   }
 
@@ -295,7 +297,11 @@ export const updateTrade = (id: string, input: TradeFormInput): string => {
   const sqlite = getRawSqlite();
   const tx = sqlite.transaction(() => {
     sqlite.prepare(`DELETE FROM trade_items WHERE trade_id = ?`).run(id);
-    sqlite.prepare(`DELETE FROM ledger_entries WHERE trade_id = ?`).run(id);
+    // Only remove the trade's own invoice/bill postings — keep any on-trade
+    // receipt/payment cash entries (they represent real money movements).
+    sqlite
+      .prepare(`DELETE FROM ledger_entries WHERE trade_id = ? AND entry_type = 'trade'`)
+      .run(id);
     db.update(trades)
       .set({ ...tradeColumnValues(input, d), updatedAt: new Date().toISOString() })
       .where(eq(trades.id, id))

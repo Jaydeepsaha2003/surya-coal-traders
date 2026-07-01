@@ -404,7 +404,7 @@ const postEntry = (
         id,
         partyType,
         partyId: input.partyId,
-        tradeId: null,
+        tradeId: input.tradeId ?? null,
         entryType,
         date: input.date,
         voucher: nextVoucher(prefix),

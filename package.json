@@ -1,6 +1,6 @@
 {
   "name": "surya-coal-traders",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Local-first desktop app for Surya Coal Traders — trades, ledgers, aging and P&L",
   "main": "dist-electron/main/main.js",
   "author": "Merkatura",
@@ -88,7 +88,7 @@
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Surya Coal Traders",

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Loader2, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { Search, Loader2, ArrowDownCircle, ArrowUpCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -60,6 +61,17 @@ export const SummaryPage = () => {
     [rows, search],
   );
 
+  const remove = async (r: any) => {
+    if (!window.confirm(`Delete ${r.voucher} (${r.partyName})? This cannot be undone.`)) return;
+    try {
+      await window.surya.ledger.deleteEntry(r.id);
+      toast.success('Entry deleted');
+      await load();
+    } catch (err) {
+      toast.error('Delete failed', { description: (err as Error).message });
+    }
+  };
+
   if (rows === null) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -72,14 +84,19 @@ export const SummaryPage = () => {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-lg border bg-card p-3">
         <DateRangeFilter value={range} onChange={setRange} presets />
-        <div className="relative max-w-xs flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search party, voucher, note…"
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative w-56">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search party, voucher, note…"
+              className="pl-8"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" onClick={load} title="Refresh">
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
         </div>
       </div>
 
@@ -96,10 +113,10 @@ export const SummaryPage = () => {
         </TabsList>
 
         <TabsContent value="collections">
-          <TxnTable rows={collections} partyLabel="Customer" amountLabel="Received" />
+          <TxnTable rows={collections} partyLabel="Customer" amountLabel="Received" onDelete={remove} />
         </TabsContent>
         <TabsContent value="payments">
-          <TxnTable rows={payments} partyLabel="Supplier" amountLabel="Paid" />
+          <TxnTable rows={payments} partyLabel="Supplier" amountLabel="Paid" onDelete={remove} />
         </TabsContent>
       </Tabs>
     </div>
@@ -110,10 +127,12 @@ const TxnTable = ({
   rows,
   partyLabel,
   amountLabel,
+  onDelete,
 }: {
   rows: any[];
   partyLabel: string;
   amountLabel: string;
+  onDelete: (r: any) => void;
 }) => {
   const total = rows.reduce((s, r) => s + r.amount, 0);
   return (
@@ -131,6 +150,7 @@ const TxnTable = ({
               <TableHead>{partyLabel}</TableHead>
               <TableHead>Description</TableHead>
               <TableHead className="text-right">{amountLabel}</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -142,6 +162,11 @@ const TxnTable = ({
                 <TableCell className="text-muted-foreground">{r.description || '—'}</TableCell>
                 <TableCell className="text-right tabular-nums font-medium">
                   {formatCurrencyPaise(r.amount)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" onClick={() => onDelete(r)} title="Delete">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
