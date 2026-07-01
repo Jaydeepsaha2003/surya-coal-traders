@@ -1,6 +1,6 @@
 {
   "name": "surya-coal-traders",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local-first desktop app for Surya Coal Traders — trades, ledgers, aging and P&L",
   "main": "dist-electron/main/main.js",
   "author": "Merkatura",

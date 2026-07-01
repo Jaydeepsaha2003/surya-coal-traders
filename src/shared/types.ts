@@ -59,6 +59,8 @@ export type TradeLineInput = {
   ratePerTon: number; // rupees from UI; converted to paise
 };
 
+export type TransportMode = 'per_ton' | 'fixed';
+
 export type TradeFormInput = {
   date: string; // yyyy-MM-dd
   lorryNo?: string;
@@ -68,6 +70,17 @@ export type TradeFormInput = {
   remarks?: string;
   purchaseItems: TradeLineInput[];
   saleItems: TradeLineInput[];
+  // Transportation
+  transporterId?: string | null;
+  transporterName?: string | null;
+  transportMode?: TransportMode;
+  transportQty?: number; // tons (per_ton mode)
+  transportRate?: number; // rupees/ton (per_ton mode)
+  transportFixed?: number; // rupees (fixed mode)
+  transportChargedToCustomer?: boolean; // default true
+  // Optional on-the-spot cash at trade time
+  receivedFromCustomer?: number; // rupees collected now
+  paidToSupplier?: number; // rupees paid now
 };
 
 export type TradeWithItems = Trade & {
@@ -84,11 +97,34 @@ export type TradeRow = Trade & {
 
 export type LedgerPartyType = 'customer' | 'supplier';
 
+// How a receipt/payment clears outstanding invoices:
+//  bill_to_bill — user picks specific invoices + amounts
+//  on_account   — auto-apply FIFO to oldest open invoices
+//  advance      — leave unapplied (also used automatically when no invoices exist)
+export type ClearingMode = 'bill_to_bill' | 'on_account' | 'advance';
+
+export type AllocationInput = { invoiceEntryId: string; amount: number }; // rupees
+
+export type OpenInvoice = {
+  entryId: string;
+  partyId: string;
+  partyName: string;
+  date: string;
+  voucher: string;
+  description: string | null;
+  amount: number; // original charge, paise
+  allocated: number; // already cleared, paise
+  remaining: number; // paise
+  ageDays: number; // days since the invoice date
+};
+
 export type ReceiptPaymentInput = {
   partyId: string;
   date: string; // yyyy-MM-dd
   amount: number; // rupees from UI; converted to paise
   description?: string;
+  mode?: ClearingMode; // defaults to on_account
+  allocations?: AllocationInput[]; // required for bill_to_bill
 };
 
 export type OutstandingRow = {
@@ -116,15 +152,37 @@ export type AgingSummary = {
   bucket0_30: number;
   bucket31_90: number;
   bucket90Plus: number;
+  advance: number; // unapplied receipts/payments (on-account/advance money) held
 };
 
 export type LedgerLine = {
+  id: string;
   date: string;
   voucher: string;
   description: string | null;
   debit: number;
   credit: number;
   balance: number; // running balance, paise (signed per party convention)
+  entryType: string; // 'trade' | 'opening' | 'receipt' | 'payment'
+  advance: number; // unapplied portion of a receipt/payment (paise)
+};
+
+export type UpdateReceiptPaymentInput = {
+  entryId: string;
+  date: string;
+  amount: number; // rupees
+  description?: string;
+};
+
+// Row for the receipts & payments day-book / summary export.
+export type ReceiptPaymentRow = {
+  id: string;
+  date: string;
+  voucher: string;
+  kind: 'receipt' | 'payment';
+  partyName: string;
+  description: string | null;
+  amount: number; // paise
 };
 
 // ----- Dashboard -----

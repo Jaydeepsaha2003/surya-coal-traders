@@ -17,20 +17,26 @@ import {
   updateSupplier,
   updateTransporter,
 } from './repo/masters';
-import { createTrade, deleteTrade, getTrade, listTrades, recentTrades } from './repo/trades';
+import { createTrade, deleteTrade, getTrade, listTrades, recentTrades, updateTrade } from './repo/trades';
 import {
   addPayment,
   addReceipt,
+  allOpenInvoices,
   creditorsAging,
   creditorsSummary,
   debtorsAging,
   debtorsSummary,
+  deleteLedgerEntry,
+  openInvoices,
   partyLedger,
+  updateReceiptPayment,
 } from './repo/ledger';
 import { dashboardMetrics, monthlyPnl, reportSummary, whoToCall } from './repo/dashboard';
 import { listPurchaseItems, listSaleItems } from './repo/items';
 import { readSettings, updateSettings } from './repo/settings';
 import { exportReportExcel } from './excel-export';
+import { downloadMasterTemplate, importMasters, type MasterKind } from './bulk-masters';
+import { exportReceiptsPayments } from './receipts-export';
 import type { LedgerPartyType } from '../shared/types';
 
 const handle = <T>(channel: string, fn: (...args: any[]) => Promise<T> | T) => {
@@ -48,6 +54,10 @@ export const registerIpc = () => {
   // Settings
   handle(IPC.settingsGet, () => readSettings());
   handle(IPC.settingsUpdate, (patch: any) => updateSettings(patch));
+
+  // Masters bulk
+  handle(IPC.mastersDownloadTemplate, (kind: MasterKind) => downloadMasterTemplate(kind));
+  handle(IPC.mastersImport, (kind: MasterKind) => importMasters(kind));
 
   // Customers
   handle(IPC.customersList, () => listCustomers());
@@ -74,6 +84,7 @@ export const registerIpc = () => {
   handle(IPC.tradesList, (search?: string) => listTrades(search));
   handle(IPC.tradesGet, (id: string) => getTrade(id));
   handle(IPC.tradesCreate, (input: any) => createTrade(input));
+  handle(IPC.tradesUpdate, (id: string, input: any) => updateTrade(id, input));
   handle(IPC.tradesDelete, (id: string) => deleteTrade(id));
   handle(IPC.tradesRecent, (limit?: number) => recentTrades(limit ?? 10));
 
@@ -85,8 +96,14 @@ export const registerIpc = () => {
   handle(IPC.ledgerPartyEntries, (partyType: LedgerPartyType, partyId: string) =>
     partyLedger(partyType, partyId),
   );
+  handle(IPC.ledgerOpenInvoices, (partyType: LedgerPartyType, partyId: string) =>
+    openInvoices(partyType, partyId),
+  );
+  handle(IPC.ledgerAllOpenInvoices, (partyType: LedgerPartyType) => allOpenInvoices(partyType));
   handle(IPC.ledgerAddReceipt, (input: any) => addReceipt(input));
   handle(IPC.ledgerAddPayment, (input: any) => addPayment(input));
+  handle(IPC.ledgerUpdateEntry, (input: any) => updateReceiptPayment(input));
+  handle(IPC.ledgerDeleteEntry, (entryId: string) => deleteLedgerEntry(entryId));
 
   // Purchases / Sales
   handle(IPC.purchasesList, () => listPurchaseItems());
@@ -100,4 +117,7 @@ export const registerIpc = () => {
   // Reports
   handle(IPC.reportSummary, (range?: any) => reportSummary(range));
   handle(IPC.reportExportExcel, () => exportReportExcel());
+  handle(IPC.reportReceiptsPaymentsExport, (range: any, fmt: 'xlsx' | 'pdf') =>
+    exportReceiptsPayments(range, fmt),
+  );
 };

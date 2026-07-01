@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Search, Eye, Trash2, X } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, X, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -33,7 +33,7 @@ import { DateRangeFilter, type Range } from '@/components/date-range';
 import { COAL_GRADES } from '@shared/types';
 import { formatCurrencyPaise, formatDate, isoToday } from '@/lib/utils';
 
-type Party = { id: string; name: string };
+type Party = { id: string; name: string; location?: string | null };
 type Line = {
   partyId: string;
   particulars: string;
@@ -50,6 +50,7 @@ export const TradesPage = () => {
   const [search, setSearch] = useState('');
   const [range, setRange] = useState<Range>({ from: '', to: '' });
   const [formOpen, setFormOpen] = useState(false);
+  const [editTrade, setEditTrade] = useState<any | null>(null);
   const [detail, setDetail] = useState<any | null>(null);
 
   const load = async () => {
@@ -87,6 +88,16 @@ export const TradesPage = () => {
     }
   };
 
+  const openEdit = async (id: string) => {
+    try {
+      const t = await window.surya.trades.get(id);
+      setEditTrade(t);
+      setFormOpen(true);
+    } catch (err) {
+      toast.error('Failed to open trade', { description: (err as Error).message });
+    }
+  };
+
   const remove = async (t: any) => {
     if (!window.confirm(`Delete trade ${t.tradeNo}? This also removes its ledger postings.`)) return;
     try {
@@ -110,7 +121,12 @@ export const TradesPage = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button onClick={() => setFormOpen(true)}>
+        <Button
+          onClick={() => {
+            setEditTrade(null);
+            setFormOpen(true);
+          }}
+        >
           <Plus className="h-4 w-4" /> New Trade
         </Button>
       </div>
@@ -157,10 +173,13 @@ export const TradesPage = () => {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openDetail(t.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => openDetail(t.id)} title="View">
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => remove(t)}>
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(t.id)} title="Edit">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => remove(t)} title="Delete">
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -174,9 +193,14 @@ export const TradesPage = () => {
 
       {formOpen && (
         <TradeFormModal
-          onClose={() => setFormOpen(false)}
+          trade={editTrade}
+          onClose={() => {
+            setFormOpen(false);
+            setEditTrade(null);
+          }}
           onSaved={() => {
             setFormOpen(false);
+            setEditTrade(null);
             load();
           }}
         />
@@ -188,28 +212,67 @@ export const TradesPage = () => {
 
 // --------------------------- New Trade form ---------------------------
 
-const TradeFormModal = ({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) => {
+const itemToLine = (it: any): Line => ({
+  partyId: it.partyId ?? '',
+  particulars: it.particulars ?? '',
+  location: it.location ?? '',
+  qty: it.qtyTons ? String(it.qtyTons) : '',
+  rate: it.ratePerTon ? String(it.ratePerTon / 100) : '',
+});
+
+const TradeFormModal = ({
+  trade,
+  onClose,
+  onSaved,
+}: {
+  trade?: any | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) => {
+  const isEdit = !!trade;
   const [suppliers, setSuppliers] = useState<Party[]>([]);
   const [customers, setCustomers] = useState<Party[]>([]);
-  const [date, setDate] = useState(isoToday());
-  const [lorryNo, setLorryNo] = useState('');
-  const [grade, setGrade] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [remarks, setRemarks] = useState('');
-  const [purchase, setPurchase] = useState<Line[]>([blankLine()]);
-  const [sale, setSale] = useState<Line[]>([blankLine()]);
+  const [transporters, setTransporters] = useState<Party[]>([]);
+  const [date, setDate] = useState(trade?.date ?? isoToday());
+  const [lorryNo, setLorryNo] = useState(trade?.lorryNo ?? '');
+  const [grade, setGrade] = useState(trade?.grade ?? '');
+  const [from, setFrom] = useState(trade?.fromLocation ?? '');
+  const [to, setTo] = useState(trade?.toLocation ?? '');
+  const [remarks, setRemarks] = useState(trade?.remarks ?? '');
+  const [purchase, setPurchase] = useState<Line[]>(
+    trade?.purchaseItems?.length ? trade.purchaseItems.map(itemToLine) : [blankLine()],
+  );
+  const [sale, setSale] = useState<Line[]>(
+    trade?.saleItems?.length ? trade.saleItems.map(itemToLine) : [blankLine()],
+  );
   const [saving, setSaving] = useState(false);
+  // Transport
+  const [transporterId, setTransporterId] = useState(trade?.transporterId ?? '');
+  const [transportMode, setTransportMode] = useState<'per_ton' | 'fixed'>(
+    trade?.transportMode === 'fixed' ? 'fixed' : 'per_ton',
+  );
+  const [transportQty, setTransportQty] = useState(trade?.transportQty ? String(trade.transportQty) : '');
+  const [transportRate, setTransportRate] = useState(
+    trade?.transportRate ? String(trade.transportRate / 100) : '',
+  );
+  const [transportFixed, setTransportFixed] = useState(
+    trade?.transportMode === 'fixed' && trade?.transportCost ? String(trade.transportCost / 100) : '',
+  );
+  // On-the-spot cash (create only)
+  const [received, setReceived] = useState('');
+  const [paid, setPaid] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
-        const [s, c] = await Promise.all([
+        const [s, c, t] = await Promise.all([
           window.surya.suppliers.list(),
           window.surya.customers.list(),
+          window.surya.transporters.list(),
         ]);
         setSuppliers(s);
         setCustomers(c);
+        setTransporters(t);
       } catch (err) {
         toast.error('Failed to load masters', { description: (err as Error).message });
       }
@@ -218,7 +281,15 @@ const TradeFormModal = ({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 
   const totalPurchase = useMemo(() => purchase.reduce((s, l) => s + lineAmount(l), 0), [purchase]);
   const totalSale = useMemo(() => sale.reduce((s, l) => s + lineAmount(l), 0), [sale]);
+  const hasCustomer = sale.some((l) => l.partyId);
+  const transportCost =
+    transportMode === 'fixed'
+      ? Number(transportFixed) || 0
+      : (Number(transportQty) || 0) * (Number(transportRate) || 0);
+  // Transport is always billed to the customer (when one exists) and never in profit.
+  const transportBilled = hasCustomer && transportCost > 0;
   const grossProfit = totalSale - totalPurchase;
+  const customerReceivable = totalSale + (transportBilled ? transportCost : 0) - (Number(received) || 0);
 
   const save = async () => {
     if (!date) {
@@ -233,19 +304,34 @@ const TradeFormModal = ({ onClose, onSaved }: { onClose: () => void; onSaved: ()
       qtyTons: Number(l.qty) || 0,
       ratePerTon: Number(l.rate) || 0,
     });
+    const payload: any = {
+      date,
+      lorryNo: lorryNo || undefined,
+      grade: grade || '',
+      fromLocation: from || undefined,
+      toLocation: to || undefined,
+      remarks: remarks || undefined,
+      purchaseItems: purchase.map((l) => toLine(l, suppliers)),
+      saleItems: sale.map((l) => toLine(l, customers)),
+      transporterId: transporterId || null,
+      transporterName: transporters.find((p) => p.id === transporterId)?.name ?? null,
+      transportMode,
+      transportQty: Number(transportQty) || 0,
+      transportRate: Number(transportRate) || 0,
+      transportFixed: Number(transportFixed) || 0,
+      transportChargedToCustomer: true,
+    };
     setSaving(true);
     try {
-      await window.surya.trades.create({
-        date,
-        lorryNo: lorryNo || undefined,
-        grade: grade || '',
-        fromLocation: from || undefined,
-        toLocation: to || undefined,
-        remarks: remarks || undefined,
-        purchaseItems: purchase.map((l) => toLine(l, suppliers)),
-        saleItems: sale.map((l) => toLine(l, customers)),
-      });
-      toast.success('Trade saved — ledgers updated');
+      if (isEdit) {
+        await window.surya.trades.update(trade.id, payload);
+        toast.success('Trade updated — ledgers adjusted');
+      } else {
+        payload.receivedFromCustomer = Number(received) || 0;
+        payload.paidToSupplier = Number(paid) || 0;
+        await window.surya.trades.create(payload);
+        toast.success('Trade saved — ledgers updated');
+      }
       onSaved();
     } catch (err) {
       toast.error('Save failed', { description: (err as Error).message });
@@ -258,7 +344,9 @@ const TradeFormModal = ({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Trade Entry — Purchase + Sale · Auto P&amp;L</DialogTitle>
+          <DialogTitle>
+            {isEdit ? `Edit Trade ${trade.tradeNo}` : 'New Trade Entry'} — Purchase + Sale · Auto P&amp;L
+          </DialogTitle>
         </DialogHeader>
 
         {/* Trade information */}
@@ -315,15 +403,124 @@ const TradeFormModal = ({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           setLines={setSale}
         />
 
+        {/* Transportation */}
+        <section className="space-y-2 rounded-lg border p-4">
+          <h3 className="text-sm font-semibold text-sky-600">Transportation</h3>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Field label="Transporter">
+              <Select value={transporterId} onValueChange={setTransporterId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {transporters.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Cost basis">
+              <div className="flex gap-1">
+                {(['per_ton', 'fixed'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setTransportMode(m)}
+                    className={
+                      'flex-1 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ' +
+                      (transportMode === m ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-accent')
+                    }
+                  >
+                    {m === 'per_ton' ? 'Per Ton' : 'Fixed'}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            {transportMode === 'per_ton' ? (
+              <>
+                <Field label="Qty (T)">
+                  <Input
+                    type="number"
+                    value={transportQty}
+                    onChange={(e) => setTransportQty(e.target.value)}
+                  />
+                </Field>
+                <Field label="Rate/Ton (₹)">
+                  <Input
+                    type="number"
+                    value={transportRate}
+                    onChange={(e) => setTransportRate(e.target.value)}
+                  />
+                </Field>
+              </>
+            ) : (
+              <Field label="Fixed fee (₹)">
+                <Input
+                  type="number"
+                  value={transportFixed}
+                  onChange={(e) => setTransportFixed(e.target.value)}
+                />
+              </Field>
+            )}
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-xs text-muted-foreground">
+              Always billed to the customer · not counted in profit (pass-through).
+            </span>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Transport cost:&nbsp;</span>
+              <span className="font-semibold tabular-nums">
+                {formatCurrencyPaise(Math.round(transportCost * 100))}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* On-the-spot payments — new trades only */}
+        {!isEdit && (
+          <section className="grid grid-cols-1 gap-3 rounded-lg border p-4 md:grid-cols-2">
+            <Field label="Received from customer now (₹)">
+              <Input
+                type="number"
+                placeholder="0"
+                value={received}
+                onChange={(e) => setReceived(e.target.value)}
+              />
+            </Field>
+            <Field label="Paid to supplier now (₹)">
+              <Input
+                type="number"
+                placeholder="0"
+                value={paid}
+                onChange={(e) => setPaid(e.target.value)}
+              />
+            </Field>
+          </section>
+        )}
+
         {/* Summary */}
-        <div className="grid grid-cols-3 gap-3 rounded-lg border bg-muted/40 p-4">
+        <div className="grid grid-cols-2 gap-3 rounded-lg border bg-muted/40 p-4 md:grid-cols-4">
           <Summary label="Total Purchase" value={totalPurchase} />
           <Summary label="Total Sale" value={totalSale} />
+          <Summary label="Transport" value={transportCost} className="text-sky-600" />
           <Summary
             label="Gross Profit"
             value={grossProfit}
             className={grossProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}
           />
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Customer will owe{' '}
+          <span className="font-medium text-foreground">
+            {formatCurrencyPaise(Math.round(customerReceivable * 100))}
+          </span>{' '}
+          after this trade{transportBilled ? ' (incl. transport)' : ''}
+          {!isEdit && Number(received) > 0 ? ` and ₹${received} received now` : ''}.
+          {!hasCustomer && transportCost > 0
+            ? ' — add a customer to bill the transport charge.'
+            : ''}
         </div>
 
         <DialogFooter>
@@ -331,7 +528,7 @@ const TradeFormModal = ({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             Cancel
           </Button>
           <Button onClick={save} disabled={saving}>
-            {saving ? 'Saving…' : 'Save Trade'}
+            {saving ? 'Saving…' : isEdit ? 'Update Trade' : 'Save Trade'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -384,7 +581,13 @@ const LineEditor = ({
             {lines.map((l, i) => (
               <tr key={i} className="border-b last:border-0">
                 <td className="p-1.5 align-top" style={{ minWidth: 160 }}>
-                  <Select value={l.partyId} onValueChange={(v) => update(i, { partyId: v })}>
+                  <Select
+                    value={l.partyId}
+                    onValueChange={(v) => {
+                      const loc = parties.find((p) => p.id === v)?.location;
+                      update(i, { partyId: v, ...(loc ? { location: loc } : {}) });
+                    }}
+                  >
                     <SelectTrigger className="h-8">
                       <SelectValue placeholder={`Select ${partyLabel.toLowerCase()}`} />
                     </SelectTrigger>
@@ -486,15 +689,29 @@ const TradeDetailModal = ({ trade, onClose }: { trade: any; onClose: () => void 
       <ItemTable title="Purchase Items" items={trade.purchaseItems} />
       <ItemTable title="Sale Items" items={trade.saleItems} />
 
-      <div className="grid grid-cols-3 gap-3 rounded-lg border bg-muted/40 p-4">
+      <div className="grid grid-cols-2 gap-3 rounded-lg border bg-muted/40 p-4 md:grid-cols-4">
         <Info label="Total Purchase" value={formatCurrencyPaise(trade.totalPurchase)} />
         <Info label="Total Sale" value={formatCurrencyPaise(trade.totalSale)} />
+        <Info
+          label={`Transport${trade.transportChargedToCustomer ? ' (to customer)' : ' (borne)'}`}
+          value={formatCurrencyPaise(trade.transportCost)}
+        />
         <Info
           label="Gross Profit"
           value={formatCurrencyPaise(trade.grossProfit)}
           valueClass={trade.grossProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}
         />
       </div>
+      {(trade.transporterName || trade.transportCost > 0) && (
+        <div className="text-xs text-muted-foreground">
+          Transporter: {trade.transporterName || '—'}
+          {trade.transportMode === 'per_ton' && trade.transportQty
+            ? ` · ${trade.transportQty} T × ${formatCurrencyPaise(trade.transportRate)}/T`
+            : trade.transportMode === 'fixed'
+              ? ' · fixed fee'
+              : ''}
+        </div>
+      )}
 
       {trade.remarks && (
         <div className="text-sm">

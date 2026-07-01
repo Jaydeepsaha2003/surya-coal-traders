@@ -2,6 +2,7 @@ import { v4 as uuid } from 'uuid';
 import { getDb, getRawSqlite } from '../db';
 import { trades, tradeItems, ledgerEntries } from '../../shared/db/schema';
 import { eq } from 'drizzle-orm';
+import { addPayment, addReceipt } from './ledger';
 import {
   rupeesToPaise,
   type TradeFormInput,
@@ -56,6 +57,13 @@ export const listTrades = (search?: string): TradeRow[] => {
     totalPurchase: r.total_purchase,
     totalSale: r.total_sale,
     grossProfit: r.gross_profit,
+    transporterId: r.transporter_id,
+    transporterName: r.transporter_name,
+    transportMode: r.transport_mode,
+    transportQty: r.transport_qty,
+    transportRate: r.transport_rate,
+    transportCost: r.transport_cost,
+    transportChargedToCustomer: r.transport_charged_to_customer,
     remarks: r.remarks,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -102,98 +110,191 @@ const groupByParty = (lines: TradeLineInput[]) => {
   return map;
 };
 
-export const createTrade = (input: TradeFormInput): string => {
-  if (!input.date) throw new Error('Trade date is required');
+type Derived = ReturnType<typeof derive>;
 
-  const id = uuid();
-  const tradeNo = nextTradeNo();
-
+const derive = (input: TradeFormInput) => {
   const purchaseRows = (input.purchaseItems ?? []).filter(
     (l) => (Number(l.qtyTons) || 0) > 0 || (Number(l.ratePerTon) || 0) > 0 || l.partyId,
   );
   const saleRows = (input.saleItems ?? []).filter(
     (l) => (Number(l.qtyTons) || 0) > 0 || (Number(l.ratePerTon) || 0) > 0 || l.partyId,
   );
-
   const totalPurchase = purchaseRows.reduce((s, l) => s + lineAmount(l), 0);
   const totalSale = saleRows.reduce((s, l) => s + lineAmount(l), 0);
+
+  const transportMode = input.transportMode === 'fixed' ? 'fixed' : 'per_ton';
+  const transportQty = Number(input.transportQty) || 0;
+  const transportRatePaise = rupeesToPaise(Number(input.transportRate) || 0);
+  const transportCost =
+    transportMode === 'fixed'
+      ? rupeesToPaise(Number(input.transportFixed) || 0)
+      : Math.round(transportQty * transportRatePaise);
+
+  const primaryCustomerId = saleRows.find((l) => l.partyId)?.partyId ?? null;
+  const primarySupplierId = purchaseRows.find((l) => l.partyId)?.partyId ?? null;
+
+  // Transport is always billed to the customer (when one exists) and is never
+  // part of profit — it is a pass-through recovery.
+  const chargeToCustomer = !!primaryCustomerId && transportCost > 0;
   const grossProfit = totalSale - totalPurchase;
+
+  return {
+    purchaseRows,
+    saleRows,
+    totalPurchase,
+    totalSale,
+    transportMode: transportMode as 'per_ton' | 'fixed',
+    transportQty,
+    transportRatePaise,
+    transportCost,
+    primaryCustomerId,
+    primarySupplierId,
+    chargeToCustomer,
+    grossProfit,
+  };
+};
+
+const tradeColumnValues = (input: TradeFormInput, d: Derived) => ({
+  date: input.date,
+  lorryNo: input.lorryNo ?? null,
+  grade: input.grade || null,
+  fromLocation: input.fromLocation ?? null,
+  toLocation: input.toLocation ?? null,
+  totalPurchase: d.totalPurchase,
+  totalSale: d.totalSale,
+  grossProfit: d.grossProfit,
+  transporterId: input.transporterId ?? null,
+  transporterName: input.transporterName ?? null,
+  transportMode: d.transportMode,
+  transportQty: d.transportQty,
+  transportRate: d.transportRatePaise,
+  transportCost: d.transportCost,
+  transportChargedToCustomer: d.chargeToCustomer ? 1 : 0,
+  remarks: input.remarks ?? null,
+});
+
+// Insert this trade's line items and its supplier/customer ledger postings.
+const writeItemsAndLedger = (tradeId: string, tradeNo: string, input: TradeFormInput, d: Derived) => {
+  const db = getDb();
+  const insertItem = (side: 'purchase' | 'sale', line: TradeLineInput) => {
+    db.insert(tradeItems)
+      .values({
+        id: uuid(),
+        tradeId,
+        side,
+        partyId: line.partyId ?? null,
+        partyName: line.partyName ?? null,
+        particulars: line.particulars ?? null,
+        location: line.location ?? null,
+        qtyTons: Number(line.qtyTons) || 0,
+        ratePerTon: rupeesToPaise(Number(line.ratePerTon) || 0),
+        amount: lineAmount(line),
+      })
+      .run();
+  };
+  d.purchaseRows.forEach((l) => insertItem('purchase', l));
+  d.saleRows.forEach((l) => insertItem('sale', l));
+
+  const routeDesc = [input.fromLocation, input.toLocation].filter(Boolean).join(' → ');
+
+  for (const [partyId, info] of groupByParty(d.purchaseRows)) {
+    db.insert(ledgerEntries)
+      .values({
+        id: uuid(),
+        partyType: 'supplier',
+        partyId,
+        tradeId,
+        entryType: 'trade',
+        date: input.date,
+        voucher: tradeNo,
+        description: `Purchase${routeDesc ? ' · ' + routeDesc : ''}`,
+        debit: 0,
+        credit: info.amount,
+      })
+      .run();
+  }
+
+  for (const [partyId, info] of groupByParty(d.saleRows)) {
+    const addTransport = d.chargeToCustomer && partyId === d.primaryCustomerId;
+    const debit = info.amount + (addTransport ? d.transportCost : 0);
+    db.insert(ledgerEntries)
+      .values({
+        id: uuid(),
+        partyType: 'customer',
+        partyId,
+        tradeId,
+        entryType: 'trade',
+        date: input.date,
+        voucher: tradeNo,
+        description: `Sale${routeDesc ? ' · ' + routeDesc : ''}${addTransport ? ' · incl. transport' : ''}`,
+        debit,
+        credit: 0,
+      })
+      .run();
+  }
+};
+
+export const createTrade = (input: TradeFormInput): string => {
+  if (!input.date) throw new Error('Trade date is required');
+  const id = uuid();
+  const tradeNo = nextTradeNo();
+  const d = derive(input);
 
   const sqlite = getRawSqlite();
   const tx = sqlite.transaction(() => {
-    const db = getDb();
-    db.insert(trades)
-      .values({
-        id,
-        tradeNo,
-        date: input.date,
-        lorryNo: input.lorryNo ?? null,
-        grade: input.grade || null,
-        fromLocation: input.fromLocation ?? null,
-        toLocation: input.toLocation ?? null,
-        totalPurchase,
-        totalSale,
-        grossProfit,
-        remarks: input.remarks ?? null,
-      })
+    getDb()
+      .insert(trades)
+      .values({ id, tradeNo, ...tradeColumnValues(input, d) })
       .run();
+    writeItemsAndLedger(id, tradeNo, input, d);
+  });
+  tx();
 
-    const insertItem = (side: 'purchase' | 'sale', line: TradeLineInput) => {
-      db.insert(tradeItems)
-        .values({
-          id: uuid(),
-          tradeId: id,
-          side,
-          partyId: line.partyId ?? null,
-          partyName: line.partyName ?? null,
-          particulars: line.particulars ?? null,
-          location: line.location ?? null,
-          qtyTons: Number(line.qtyTons) || 0,
-          ratePerTon: rupeesToPaise(Number(line.ratePerTon) || 0),
-          amount: lineAmount(line),
-        })
-        .run();
-    };
-    purchaseRows.forEach((l) => insertItem('purchase', l));
-    saleRows.forEach((l) => insertItem('sale', l));
+  // On-the-spot cash entered on the trade — posted after commit so the new
+  // invoice/bill exists and on-account FIFO can clear it.
+  if (d.primaryCustomerId && Number(input.receivedFromCustomer) > 0) {
+    addReceipt({
+      partyId: d.primaryCustomerId,
+      date: input.date,
+      amount: Number(input.receivedFromCustomer),
+      description: `Received on trade ${tradeNo}`,
+      mode: 'on_account',
+    });
+  }
+  if (d.primarySupplierId && Number(input.paidToSupplier) > 0) {
+    addPayment({
+      partyId: d.primarySupplierId,
+      date: input.date,
+      amount: Number(input.paidToSupplier),
+      description: `Paid on trade ${tradeNo}`,
+      mode: 'on_account',
+    });
+  }
 
-    const routeDesc = [input.fromLocation, input.toLocation].filter(Boolean).join(' → ');
+  return id;
+};
 
-    // Purchase side -> credit each supplier (we owe them).
-    for (const [partyId, info] of groupByParty(purchaseRows)) {
-      db.insert(ledgerEntries)
-        .values({
-          id: uuid(),
-          partyType: 'supplier',
-          partyId,
-          tradeId: id,
-          entryType: 'trade',
-          date: input.date,
-          voucher: tradeNo,
-          description: `Purchase${routeDesc ? ' · ' + routeDesc : ''}`,
-          debit: 0,
-          credit: info.amount,
-        })
-        .run();
-    }
+// Edit a trade: replaces its line items and ledger postings, keeping the same
+// trade number. NOTE: receipts already recorded against this trade's invoice
+// stay, but any that were auto-allocated to it revert to advances (they can be
+// re-applied from the ledger). On-the-spot cash fields are ignored on edit.
+export const updateTrade = (id: string, input: TradeFormInput): string => {
+  if (!input.date) throw new Error('Trade date is required');
+  const db = getDb();
+  const existing = db.select().from(trades).where(eq(trades.id, id)).get();
+  if (!existing) throw new Error('Trade not found');
+  const tradeNo = existing.tradeNo;
+  const d = derive(input);
 
-    // Sale side -> debit each customer (they owe us).
-    for (const [partyId, info] of groupByParty(saleRows)) {
-      db.insert(ledgerEntries)
-        .values({
-          id: uuid(),
-          partyType: 'customer',
-          partyId,
-          tradeId: id,
-          entryType: 'trade',
-          date: input.date,
-          voucher: tradeNo,
-          description: `Sale${routeDesc ? ' · ' + routeDesc : ''}`,
-          debit: info.amount,
-          credit: 0,
-        })
-        .run();
-    }
+  const sqlite = getRawSqlite();
+  const tx = sqlite.transaction(() => {
+    sqlite.prepare(`DELETE FROM trade_items WHERE trade_id = ?`).run(id);
+    sqlite.prepare(`DELETE FROM ledger_entries WHERE trade_id = ?`).run(id);
+    db.update(trades)
+      .set({ ...tradeColumnValues(input, d), updatedAt: new Date().toISOString() })
+      .where(eq(trades.id, id))
+      .run();
+    writeItemsAndLedger(id, tradeNo, input, d);
   });
   tx();
   return id;

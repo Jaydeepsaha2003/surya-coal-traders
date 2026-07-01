@@ -99,6 +99,13 @@ const applySchema = (sqlite: Database.Database) => {
       total_purchase INTEGER NOT NULL DEFAULT 0,
       total_sale INTEGER NOT NULL DEFAULT 0,
       gross_profit INTEGER NOT NULL DEFAULT 0,
+      transporter_id TEXT,
+      transporter_name TEXT,
+      transport_mode TEXT,
+      transport_qty REAL NOT NULL DEFAULT 0,
+      transport_rate INTEGER NOT NULL DEFAULT 0,
+      transport_cost INTEGER NOT NULL DEFAULT 0,
+      transport_charged_to_customer INTEGER NOT NULL DEFAULT 1,
       remarks TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -136,6 +143,16 @@ const applySchema = (sqlite: Database.Database) => {
     );
     CREATE INDEX IF NOT EXISTS idx_ledger_party ON ledger_entries(party_type, party_id, date);
 
+    CREATE TABLE IF NOT EXISTS allocations (
+      id TEXT PRIMARY KEY,
+      payment_entry_id TEXT NOT NULL REFERENCES ledger_entries(id) ON DELETE CASCADE,
+      invoice_entry_id TEXT NOT NULL REFERENCES ledger_entries(id) ON DELETE CASCADE,
+      amount INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_alloc_payment ON allocations(payment_entry_id);
+    CREATE INDEX IF NOT EXISTS idx_alloc_invoice ON allocations(invoice_entry_id);
+
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY DEFAULT 1,
       theme TEXT NOT NULL DEFAULT 'dark',
@@ -144,9 +161,20 @@ const applySchema = (sqlite: Database.Database) => {
     INSERT OR IGNORE INTO settings (id) VALUES (1);
   `);
 
-  // Idempotent upgrade: databases created before credit_limit → credit_period
-  // get the new column added so the app keeps working.
+  // Idempotent upgrades so databases created by earlier versions keep working.
   addColumnIfMissing(sqlite, 'customers', 'credit_period', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(sqlite, 'trades', 'transporter_id', 'TEXT');
+  addColumnIfMissing(sqlite, 'trades', 'transporter_name', 'TEXT');
+  addColumnIfMissing(sqlite, 'trades', 'transport_mode', 'TEXT');
+  addColumnIfMissing(sqlite, 'trades', 'transport_qty', 'REAL NOT NULL DEFAULT 0');
+  addColumnIfMissing(sqlite, 'trades', 'transport_rate', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(sqlite, 'trades', 'transport_cost', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(
+    sqlite,
+    'trades',
+    'transport_charged_to_customer',
+    'INTEGER NOT NULL DEFAULT 1',
+  );
 };
 
 const addColumnIfMissing = (

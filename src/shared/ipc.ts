@@ -5,6 +5,10 @@ export const IPC = {
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
 
+  // Masters bulk import/template
+  mastersDownloadTemplate: 'masters:downloadTemplate',
+  mastersImport: 'masters:import',
+
   // Customers
   customersList: 'customers:list',
   customersGet: 'customers:get',
@@ -30,6 +34,7 @@ export const IPC = {
   tradesList: 'trades:list',
   tradesGet: 'trades:get',
   tradesCreate: 'trades:create',
+  tradesUpdate: 'trades:update',
   tradesDelete: 'trades:delete',
   tradesRecent: 'trades:recent',
 
@@ -39,8 +44,12 @@ export const IPC = {
   ledgerDebtorsAging: 'ledger:debtorsAging',
   ledgerCreditorsAging: 'ledger:creditorsAging',
   ledgerPartyEntries: 'ledger:partyEntries',
+  ledgerOpenInvoices: 'ledger:openInvoices',
+  ledgerAllOpenInvoices: 'ledger:allOpenInvoices',
   ledgerAddReceipt: 'ledger:addReceipt',
   ledgerAddPayment: 'ledger:addPayment',
+  ledgerUpdateEntry: 'ledger:updateEntry',
+  ledgerDeleteEntry: 'ledger:deleteEntry',
 
   // Purchases / Sales (line items across trades)
   purchasesList: 'purchases:list',
@@ -54,6 +63,7 @@ export const IPC = {
   // Reports / export
   reportSummary: 'report:summary',
   reportExportExcel: 'report:exportExcel',
+  reportReceiptsPaymentsExport: 'report:receiptsPaymentsExport',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];

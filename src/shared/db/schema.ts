@@ -72,7 +72,15 @@ export const trades = sqliteTable('trades', {
   toLocation: text('to_location'),
   totalPurchase: integer('total_purchase').notNull().default(0), // paise
   totalSale: integer('total_sale').notNull().default(0), // paise
-  grossProfit: integer('gross_profit').notNull().default(0), // paise (sale - purchase)
+  grossProfit: integer('gross_profit').notNull().default(0), // paise
+  // Transportation
+  transporterId: text('transporter_id'),
+  transporterName: text('transporter_name'),
+  transportMode: text('transport_mode'), // 'per_ton' | 'fixed'
+  transportQty: real('transport_qty').notNull().default(0),
+  transportRate: integer('transport_rate').notNull().default(0), // paise/ton
+  transportCost: integer('transport_cost').notNull().default(0), // paise
+  transportChargedToCustomer: integer('transport_charged_to_customer').notNull().default(1),
   remarks: text('remarks'),
   createdAt: text('created_at')
     .notNull()
@@ -128,6 +136,23 @@ export const ledgerEntries = sqliteTable('ledger_entries', {
     .default(sql`CURRENT_TIMESTAMP`),
 });
 
+// Links a receipt/payment ledger entry to the specific invoice/bill entry it
+// clears, and by how much. Bill-to-bill = user-chosen links; on-account = FIFO
+// links created automatically; advance = no links (unapplied money).
+export const allocations = sqliteTable('allocations', {
+  id: text('id').primaryKey(),
+  paymentEntryId: text('payment_entry_id')
+    .notNull()
+    .references(() => ledgerEntries.id, { onDelete: 'cascade' }),
+  invoiceEntryId: text('invoice_entry_id')
+    .notNull()
+    .references(() => ledgerEntries.id, { onDelete: 'cascade' }),
+  amount: integer('amount').notNull().default(0), // paise
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
+
 // Simple key/value settings (theme, etc.).
 export const settings = sqliteTable('settings', {
   id: integer('id').primaryKey().default(1),
@@ -141,4 +166,5 @@ export type Transporter = typeof transporters.$inferSelect;
 export type Trade = typeof trades.$inferSelect;
 export type TradeItem = typeof tradeItems.$inferSelect;
 export type LedgerEntry = typeof ledgerEntries.$inferSelect;
+export type Allocation = typeof allocations.$inferSelect;
 export type Settings = typeof settings.$inferSelect;

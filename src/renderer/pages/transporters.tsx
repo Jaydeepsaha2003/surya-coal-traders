@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -103,6 +103,27 @@ export const TransportersPage = () => {
     }
   };
 
+  const downloadTemplate = async () => {
+    try {
+      const r = await window.surya.masters.downloadTemplate('transporters');
+      if (r.saved) toast.success('Template saved', { description: r.path });
+    } catch (err) {
+      toast.error('Failed', { description: (err as Error).message });
+    }
+  };
+  const importExcel = async () => {
+    try {
+      const r = await window.surya.masters.import('transporters');
+      if (!r.picked) return;
+      toast.success(`Imported ${r.created}, skipped ${r.skipped}`, {
+        description: r.errors.length ? `${r.errors.length} row(s) had errors` : undefined,
+      });
+      load();
+    } catch (err) {
+      toast.error('Import failed', { description: (err as Error).message });
+    }
+  };
+
   const filtered = rows.filter((t) =>
     [t.name, t.location, t.phone, t.vehicleNo]
       .filter(Boolean)
@@ -121,9 +142,17 @@ export const TransportersPage = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" /> Add New
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={downloadTemplate}>
+            <Download className="h-4 w-4" /> Template
+          </Button>
+          <Button variant="outline" onClick={importExcel}>
+            <Upload className="h-4 w-4" /> Import
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4" /> Add New
+          </Button>
+        </div>
       </div>
 
       <Card>
