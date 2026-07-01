@@ -29,6 +29,7 @@ import {
   deleteLedgerEntry,
   openInvoices,
   partyLedger,
+  receiptsPaymentsRows,
   updateReceiptPayment,
 } from './repo/ledger';
 import { dashboardMetrics, monthlyPnl, reportSummary, whoToCall } from './repo/dashboard';
@@ -104,6 +105,7 @@ export const registerIpc = () => {
   handle(IPC.ledgerAddPayment, (input: any) => addPayment(input));
   handle(IPC.ledgerUpdateEntry, (input: any) => updateReceiptPayment(input));
   handle(IPC.ledgerDeleteEntry, (entryId: string) => deleteLedgerEntry(entryId));
+  handle(IPC.ledgerReceiptsPayments, (range?: any) => receiptsPaymentsRows(range));
 
   // Purchases / Sales
   handle(IPC.purchasesList, () => listPurchaseItems());

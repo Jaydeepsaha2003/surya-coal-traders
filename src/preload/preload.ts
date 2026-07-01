@@ -71,6 +71,8 @@ const api = {
     addPayment: (input: unknown) => invoke<string>(IPC.ledgerAddPayment, input),
     updateEntry: (input: unknown) => invoke(IPC.ledgerUpdateEntry, input),
     deleteEntry: (entryId: string) => invoke(IPC.ledgerDeleteEntry, entryId),
+    receiptsPayments: (range?: { from?: string; to?: string }) =>
+      invoke<any[]>(IPC.ledgerReceiptsPayments, range),
   },
   purchases: {
     list: () => invoke<any[]>(IPC.purchasesList),

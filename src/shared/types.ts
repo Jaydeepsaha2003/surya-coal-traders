@@ -63,6 +63,8 @@ export type TransportMode = 'per_ton' | 'fixed';
 
 export type TradeFormInput = {
   date: string; // yyyy-MM-dd
+  purchaseVoucher?: string; // optional; blank => auto trade number
+  saleVoucher?: string;
   lorryNo?: string;
   grade?: CoalGrade | '';
   fromLocation?: string;

@@ -9,7 +9,10 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   FileBarChart,
+  Wallet,
   Flame,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useRouter, type Route } from '@/lib/router';
 import { cn } from '@/lib/utils';
@@ -49,12 +52,19 @@ const groups: Group[] = [
     items: [
       { key: 'debtors', label: 'Debtors', path: '/debtors', icon: ArrowDownCircle },
       { key: 'creditors', label: 'Creditors', path: '/creditors', icon: ArrowUpCircle },
+      { key: 'summary', label: 'Summary', path: '/summary', icon: Wallet },
       { key: 'reports', label: 'Reports', path: '/reports', icon: FileBarChart },
     ],
   },
 ];
 
-export const Sidebar = ({ collapsed }: { collapsed: boolean }) => {
+export const Sidebar = ({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) => {
   const { route, navigate } = useRouter();
   return (
     <aside
@@ -134,11 +144,27 @@ export const Sidebar = ({ collapsed }: { collapsed: boolean }) => {
         ))}
       </nav>
 
-      {!collapsed && (
-        <div className="border-t border-white/10 p-3 text-[11px] text-blue-200/50">
-          Data lives on this machine.
-        </div>
-      )}
+      <div className="mt-auto border-t border-white/10 p-2">
+        <button
+          onClick={onToggle}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className={cn(
+            'flex items-center rounded-md text-sm font-medium text-blue-100/75 transition-colors hover:bg-white/10 hover:text-white',
+            collapsed ? 'w-full justify-center px-2 py-2' : 'w-full gap-2 px-3 py-2',
+          )}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-4 w-4 shrink-0" />
+          ) : (
+            <PanelLeftClose className="h-4 w-4 shrink-0" />
+          )}
+          {!collapsed && <span>Collapse</span>}
+        </button>
+        {!collapsed && (
+          <div className="px-1 pt-2 text-[11px] text-blue-200/50">Data lives on this machine.</div>
+        )}
+      </div>
     </aside>
   );
 };

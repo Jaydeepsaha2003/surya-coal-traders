@@ -50,6 +50,7 @@ export const IPC = {
   ledgerAddPayment: 'ledger:addPayment',
   ledgerUpdateEntry: 'ledger:updateEntry',
   ledgerDeleteEntry: 'ledger:deleteEntry',
+  ledgerReceiptsPayments: 'ledger:receiptsPayments',
 
   // Purchases / Sales (line items across trades)
   purchasesList: 'purchases:list',

@@ -11,6 +11,7 @@ import { SuppliersPage } from './pages/suppliers';
 import { TransportersPage } from './pages/transporters';
 import { DebtorsPage } from './pages/debtors';
 import { CreditorsPage } from './pages/creditors';
+import { SummaryPage } from './pages/summary';
 import { ReportsPage } from './pages/reports';
 
 const PageSwitch = () => {
@@ -34,6 +35,8 @@ const PageSwitch = () => {
       return <DebtorsPage />;
     case 'creditors':
       return <CreditorsPage />;
+    case 'summary':
+      return <SummaryPage />;
     case 'reports':
       return <ReportsPage />;
   }
@@ -62,7 +65,7 @@ const Shell = () => {
   };
   return (
     <div className="flex h-screen w-screen overflow-hidden">
-      <Sidebar collapsed={collapsed} />
+      <Sidebar collapsed={collapsed} onToggle={toggle} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar sidebarCollapsed={collapsed} onToggleSidebar={toggle} />
         <main className="flex-1 overflow-auto bg-background">

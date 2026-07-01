@@ -239,6 +239,8 @@ const TradeFormModal = ({
   const [from, setFrom] = useState(trade?.fromLocation ?? '');
   const [to, setTo] = useState(trade?.toLocation ?? '');
   const [remarks, setRemarks] = useState(trade?.remarks ?? '');
+  const [purchaseVoucher, setPurchaseVoucher] = useState(trade?.purchaseVoucher ?? '');
+  const [saleVoucher, setSaleVoucher] = useState(trade?.saleVoucher ?? '');
   const [purchase, setPurchase] = useState<Line[]>(
     trade?.purchaseItems?.length ? trade.purchaseItems.map(itemToLine) : [blankLine()],
   );
@@ -289,7 +291,8 @@ const TradeFormModal = ({
   // Transport is always billed to the customer (when one exists) and never in profit.
   const transportBilled = hasCustomer && transportCost > 0;
   const grossProfit = totalSale - totalPurchase;
-  const customerReceivable = totalSale + (transportBilled ? transportCost : 0) - (Number(received) || 0);
+  const customerValue = totalSale + (transportBilled ? transportCost : 0);
+  const customerReceivable = customerValue - (Number(received) || 0);
 
   const save = async () => {
     if (!date) {
@@ -306,6 +309,8 @@ const TradeFormModal = ({
     });
     const payload: any = {
       date,
+      purchaseVoucher: purchaseVoucher || undefined,
+      saleVoucher: saleVoucher || undefined,
       lorryNo: lorryNo || undefined,
       grade: grade || '',
       fromLocation: from || undefined,
@@ -342,7 +347,7 @@ const TradeFormModal = ({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] w-[96vw] max-w-[1400px] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? `Edit Trade ${trade.tradeNo}` : 'New Trade Entry'} — Purchase + Sale · Auto P&amp;L
@@ -393,6 +398,8 @@ const TradeFormModal = ({
           parties={suppliers}
           lines={purchase}
           setLines={setPurchase}
+          voucher={purchaseVoucher}
+          onVoucher={setPurchaseVoucher}
         />
         <LineEditor
           title="Sale Items"
@@ -401,6 +408,8 @@ const TradeFormModal = ({
           parties={customers}
           lines={sale}
           setLines={setSale}
+          voucher={saleVoucher}
+          onVoucher={setSaleVoucher}
         />
 
         {/* Transportation */}
@@ -501,10 +510,11 @@ const TradeFormModal = ({
         )}
 
         {/* Summary */}
-        <div className="grid grid-cols-2 gap-3 rounded-lg border bg-muted/40 p-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 rounded-lg border bg-muted/40 p-4 md:grid-cols-5">
           <Summary label="Total Purchase" value={totalPurchase} />
           <Summary label="Total Sale" value={totalSale} />
           <Summary label="Transport" value={transportCost} className="text-sky-600" />
+          <Summary label="Customer Value" value={customerValue} />
           <Summary
             label="Gross Profit"
             value={grossProfit}
@@ -512,14 +522,22 @@ const TradeFormModal = ({
           />
         </div>
         <div className="text-xs text-muted-foreground">
-          Customer will owe{' '}
-          <span className="font-medium text-foreground">
-            {formatCurrencyPaise(Math.round(customerReceivable * 100))}
-          </span>{' '}
-          after this trade{transportBilled ? ' (incl. transport)' : ''}
-          {!isEdit && Number(received) > 0 ? ` and ₹${received} received now` : ''}.
+          Customer sale value ={' '}
+          <span className="font-medium text-foreground">{formatCurrencyPaise(Math.round(totalSale * 100))}</span>
+          {transportBilled ? (
+            <>
+              {' '}
+              + transport{' '}
+              <span className="font-medium text-sky-600">{formatCurrencyPaise(Math.round(transportCost * 100))}</span> ={' '}
+              <span className="font-medium text-foreground">{formatCurrencyPaise(Math.round(customerValue * 100))}</span>
+            </>
+          ) : null}
+          . Transport is billed to the customer but excluded from profit.
+          {!isEdit && Number(received) > 0
+            ? ` Balance after ₹${received} received now: ${formatCurrencyPaise(Math.round(customerReceivable * 100))}.`
+            : ''}
           {!hasCustomer && transportCost > 0
-            ? ' — add a customer to bill the transport charge.'
+            ? ' Add a customer to bill the transport charge.'
             : ''}
         </div>
 
@@ -543,6 +561,8 @@ const LineEditor = ({
   parties,
   lines,
   setLines,
+  voucher,
+  onVoucher,
 }: {
   title: string;
   accent: string;
@@ -550,6 +570,8 @@ const LineEditor = ({
   parties: Party[];
   lines: Line[];
   setLines: React.Dispatch<React.SetStateAction<Line[]>>;
+  voucher: string;
+  onVoucher: (v: string) => void;
 }) => {
   const update = (i: number, patch: Partial<Line>) =>
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -558,11 +580,22 @@ const LineEditor = ({
 
   return (
     <section className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className={`text-sm font-semibold ${accent}`}>{title}</h3>
-        <Button variant="outline" size="sm" onClick={() => setLines((p) => [...p, blankLine()])}>
-          <Plus className="h-3.5 w-3.5" /> Add Row
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Label className="whitespace-nowrap text-xs text-muted-foreground">Voucher No</Label>
+            <Input
+              className="h-8 w-40"
+              placeholder="Auto (Tally optional)"
+              value={voucher}
+              onChange={(e) => onVoucher(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setLines((p) => [...p, blankLine()])}>
+            <Plus className="h-3.5 w-3.5" /> Add Row
+          </Button>
+        </div>
       </div>
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full text-sm">
@@ -684,6 +717,8 @@ const TradeDetailModal = ({ trade, onClose }: { trade: any; onClose: () => void 
           label="Route"
           value={[trade.fromLocation, trade.toLocation].filter(Boolean).join(' → ') || '—'}
         />
+        <Info label="Purchase Voucher" value={trade.purchaseVoucher || trade.tradeNo} />
+        <Info label="Sale Voucher" value={trade.saleVoucher || trade.tradeNo} />
       </div>
 
       <ItemTable title="Purchase Items" items={trade.purchaseItems} />
@@ -701,6 +736,21 @@ const TradeDetailModal = ({ trade, onClose }: { trade: any; onClose: () => void 
           value={formatCurrencyPaise(trade.grossProfit)}
           valueClass={trade.grossProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}
         />
+      </div>
+      <div className="text-xs text-muted-foreground">
+        Customer billed ={' '}
+        <span className="font-medium text-foreground">{formatCurrencyPaise(trade.totalSale)}</span>
+        {trade.transportChargedToCustomer && trade.transportCost > 0 ? (
+          <>
+            {' '}
+            + transport{' '}
+            <span className="font-medium text-sky-600">{formatCurrencyPaise(trade.transportCost)}</span> ={' '}
+            <span className="font-medium text-foreground">
+              {formatCurrencyPaise(trade.totalSale + trade.transportCost)}
+            </span>
+          </>
+        ) : null}
+        . Transport is a pass-through — not counted in profit.
       </div>
       {(trade.transporterName || trade.transportCost > 0) && (
         <div className="text-xs text-muted-foreground">

@@ -59,6 +59,7 @@ type SuryaApi = {
     addPayment: (input: any) => Promise<string>;
     updateEntry: (input: any) => Promise<void>;
     deleteEntry: (entryId: string) => Promise<void>;
+    receiptsPayments: (range?: { from?: string; to?: string }) => Promise<any[]>;
   };
   purchases: {
     list: () => Promise<any[]>;

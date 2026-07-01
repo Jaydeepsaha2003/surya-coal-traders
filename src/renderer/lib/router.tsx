@@ -19,6 +19,7 @@ export type Route =
   | { name: 'transporters' }
   | { name: 'debtors' }
   | { name: 'creditors' }
+  | { name: 'summary' }
   | { name: 'reports' };
 
 const parse = (hash: string): Route => {
@@ -42,6 +43,8 @@ const parse = (hash: string): Route => {
       return { name: 'debtors' };
     case 'creditors':
       return { name: 'creditors' };
+    case 'summary':
+      return { name: 'summary' };
     case 'reports':
       return { name: 'reports' };
     default:

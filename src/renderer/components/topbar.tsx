@@ -25,6 +25,8 @@ const titleFor = (name: string): string => {
       return 'Debtors';
     case 'creditors':
       return 'Creditors';
+    case 'summary':
+      return 'Summary';
     case 'reports':
       return 'Reports';
     default:

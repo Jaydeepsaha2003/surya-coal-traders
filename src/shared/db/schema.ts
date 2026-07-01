@@ -65,6 +65,8 @@ export const transporters = sqliteTable('transporters', {
 export const trades = sqliteTable('trades', {
   id: text('id').primaryKey(),
   tradeNo: text('trade_no').notNull().unique(),
+  purchaseVoucher: text('purchase_voucher'), // optional Tally voucher; blank => auto
+  saleVoucher: text('sale_voucher'),
   date: text('date').notNull(), // yyyy-MM-dd
   lorryNo: text('lorry_no'),
   grade: text('grade'), // E | F | G | G11 | G12

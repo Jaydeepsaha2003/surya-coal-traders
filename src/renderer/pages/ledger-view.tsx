@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Phone, X, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Phone, X, Loader2, Pencil, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -49,6 +49,7 @@ export const LedgerView = ({ config }: { config: Config }) => {
   const [summary, setSummary] = useState<{ rows: any[]; summary: any } | null>(null);
   const [aging, setAging] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [receiptFor, setReceiptFor] = useState<any | null>(null);
   const [ledgerFor, setLedgerFor] = useState<any | null>(null);
 
@@ -76,7 +77,10 @@ export const LedgerView = ({ config }: { config: Config }) => {
     bucket90Plus: 0,
     advance: 0,
   };
-  const agingTotals = aging.reduce(
+  const nameMatch = (n: string) => n.toLowerCase().includes(search.toLowerCase());
+  const summaryRows = (summary?.rows ?? []).filter((r: any) => nameMatch(r.name));
+  const agingRows = aging.filter((r) => nameMatch(r.name));
+  const agingTotals = agingRows.reduce(
     (acc, r) => ({
       b1: acc.b1 + r.bucket0_30,
       b2: acc.b2 + r.bucket31_60,
@@ -111,6 +115,16 @@ export const LedgerView = ({ config }: { config: Config }) => {
         </div>
       )}
 
+      <div className="relative max-w-xs">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder={`Search ${config.partyType === 'customer' ? 'customers' : 'suppliers'}…`}
+          className="pl-8"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       <Tabs defaultValue="summary">
         <TabsList>
           <TabsTrigger value="summary">Outstanding Summary</TabsTrigger>
@@ -133,7 +147,7 @@ export const LedgerView = ({ config }: { config: Config }) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {summary?.rows.map((r) => (
+                {summaryRows.map((r: any) => (
                   <TableRow key={r.partyId}>
                     <TableCell>
                       <button
@@ -171,7 +185,7 @@ export const LedgerView = ({ config }: { config: Config }) => {
                 ))}
               </TableBody>
             </Table>
-            {(summary?.rows.length ?? 0) === 0 && <TableEmpty>Nothing outstanding. All clear!</TableEmpty>}
+            {summaryRows.length === 0 && <TableEmpty>Nothing outstanding. All clear!</TableEmpty>}
           </Card>
         </TabsContent>
 
@@ -190,7 +204,7 @@ export const LedgerView = ({ config }: { config: Config }) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {aging.map((r) => (
+                {agingRows.map((r) => (
                   <TableRow key={r.partyId}>
                     <TableCell className="font-medium">{r.name}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrencyPaise(r.bucket0_30)}</TableCell>
@@ -200,7 +214,7 @@ export const LedgerView = ({ config }: { config: Config }) => {
                     <TableCell className="text-right tabular-nums font-medium">{formatCurrencyPaise(r.total)}</TableCell>
                   </TableRow>
                 ))}
-                {aging.length > 0 && (
+                {agingRows.length > 0 && (
                   <TableRow className="bg-muted/40 font-semibold">
                     <TableCell>TOTAL</TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrencyPaise(agingTotals.b1)}</TableCell>
@@ -212,7 +226,7 @@ export const LedgerView = ({ config }: { config: Config }) => {
                 )}
               </TableBody>
             </Table>
-            {aging.length === 0 && <TableEmpty>Nothing outstanding.</TableEmpty>}
+            {agingRows.length === 0 && <TableEmpty>Nothing outstanding.</TableEmpty>}
           </Card>
         </TabsContent>
       </Tabs>

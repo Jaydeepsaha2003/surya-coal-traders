@@ -49,6 +49,8 @@ export const listTrades = (search?: string): TradeRow[] => {
   const mapped: TradeRow[] = rows.map((r) => ({
     id: r.id,
     tradeNo: r.trade_no,
+    purchaseVoucher: r.purchase_voucher,
+    saleVoucher: r.sale_voucher,
     date: r.date,
     lorryNo: r.lorry_no,
     grade: r.grade,
@@ -155,6 +157,8 @@ const derive = (input: TradeFormInput) => {
 };
 
 const tradeColumnValues = (input: TradeFormInput, d: Derived) => ({
+  purchaseVoucher: input.purchaseVoucher?.trim() || null,
+  saleVoucher: input.saleVoucher?.trim() || null,
   date: input.date,
   lorryNo: input.lorryNo ?? null,
   grade: input.grade || null,
@@ -196,6 +200,8 @@ const writeItemsAndLedger = (tradeId: string, tradeNo: string, input: TradeFormI
   d.saleRows.forEach((l) => insertItem('sale', l));
 
   const routeDesc = [input.fromLocation, input.toLocation].filter(Boolean).join(' → ');
+  const purchaseVoucher = input.purchaseVoucher?.trim() || tradeNo;
+  const saleVoucher = input.saleVoucher?.trim() || tradeNo;
 
   for (const [partyId, info] of groupByParty(d.purchaseRows)) {
     db.insert(ledgerEntries)
@@ -206,7 +212,7 @@ const writeItemsAndLedger = (tradeId: string, tradeNo: string, input: TradeFormI
         tradeId,
         entryType: 'trade',
         date: input.date,
-        voucher: tradeNo,
+        voucher: purchaseVoucher,
         description: `Purchase${routeDesc ? ' · ' + routeDesc : ''}`,
         debit: 0,
         credit: info.amount,
@@ -225,7 +231,7 @@ const writeItemsAndLedger = (tradeId: string, tradeNo: string, input: TradeFormI
         tradeId,
         entryType: 'trade',
         date: input.date,
-        voucher: tradeNo,
+        voucher: saleVoucher,
         description: `Sale${routeDesc ? ' · ' + routeDesc : ''}${addTransport ? ' · incl. transport' : ''}`,
         debit,
         credit: 0,

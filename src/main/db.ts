@@ -91,6 +91,8 @@ const applySchema = (sqlite: Database.Database) => {
     CREATE TABLE IF NOT EXISTS trades (
       id TEXT PRIMARY KEY,
       trade_no TEXT NOT NULL UNIQUE,
+      purchase_voucher TEXT,
+      sale_voucher TEXT,
       date TEXT NOT NULL,
       lorry_no TEXT,
       grade TEXT,
@@ -163,6 +165,8 @@ const applySchema = (sqlite: Database.Database) => {
 
   // Idempotent upgrades so databases created by earlier versions keep working.
   addColumnIfMissing(sqlite, 'customers', 'credit_period', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(sqlite, 'trades', 'purchase_voucher', 'TEXT');
+  addColumnIfMissing(sqlite, 'trades', 'sale_voucher', 'TEXT');
   addColumnIfMissing(sqlite, 'trades', 'transporter_id', 'TEXT');
   addColumnIfMissing(sqlite, 'trades', 'transporter_name', 'TEXT');
   addColumnIfMissing(sqlite, 'trades', 'transport_mode', 'TEXT');
